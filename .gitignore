@@ -1,0 +1,23 @@
+# Secrets — API keys live only in .env (see .env.example)
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+.pytest_cache/
+.ruff_cache/
+
+# Bench outputs and per-call traces (regenerated per run; may contain caller data)
+results/
+
+# Private study notes — not part of the published project
+docs/LEARNING.md
+
+# Local tooling state
+.claude/
+.DS_Store
