@@ -7,6 +7,8 @@ next call lands on the runner-up instead of a dead upstream.
 
 Scope note: selection and failover happen at call setup. Swapping the TTS
 service mid-call is a documented roadmap item, not something this fakes.
+Rankings load once at construction (server startup); picking up a fresh bench
+run requires a restart — continuous background probing is also roadmap.
 """
 
 import json
@@ -15,9 +17,9 @@ from time import monotonic
 
 from loguru import logger
 
-from switchboard.config import RESULTS_DIR
 from switchboard.bench.metrics import percentile
 from switchboard.bench.providers import ENV_KEYS
+from switchboard.config import RESULTS_DIR
 
 # Fallback ranking when no bench data exists yet (rough public-latency order).
 DEFAULT_ORDER = ["cartesia", "deepgram", "elevenlabs", "openai"]

@@ -10,6 +10,7 @@ Local dev: `ngrok http 8080`, set PUBLIC_HOST to the ngrok domain, and point
 the Twilio number's voice webhook at https://<PUBLIC_HOST>/voice.
 """
 
+import asyncio
 import base64
 import hashlib
 import hmac
@@ -22,13 +23,17 @@ from fastapi import FastAPI, Request, WebSocket
 from fastapi.responses import Response
 from loguru import logger
 
-from switchboard.config import env
 from switchboard.agent.playbooks import load_playbook
 from switchboard.agent.router import LatencyRouter
+from switchboard.config import env
 
 # Public-demo guards. A reachable webhook with no auth means strangers can
 # burn your API credits; these caps bound the worst case.
 MAX_CALLS_PER_DAY = int(os.getenv("MAX_CALLS_PER_DAY", "50"))
+
+# A client that connects to /ws but never sends Twilio's start event would
+# otherwise hold the socket forever.
+WS_HANDSHAKE_TIMEOUT_S = 10.0
 
 app = FastAPI(title="switchboard")
 router = LatencyRouter()
@@ -37,7 +42,8 @@ router = LatencyRouter()
 _calls_today = {"date": date.today().isoformat(), "count": 0}
 
 
-def _under_daily_cap() -> bool:
+def _consume_call_slot() -> bool:
+    """Count this call against the daily cap; False means the cap is hit."""
     today = date.today().isoformat()
     if _calls_today["date"] != today:
         _calls_today.update(date=today, count=0)
@@ -79,7 +85,7 @@ async def voice(request: Request):
         logger.warning("rejected /voice request with bad Twilio signature")
         return Response(status_code=403)
 
-    if not _under_daily_cap():
+    if not _consume_call_slot():
         logger.warning(f"daily call cap ({MAX_CALLS_PER_DAY}) reached — declining call")
         twiml = (
             '<?xml version="1.0" encoding="UTF-8"?>'
@@ -103,8 +109,6 @@ async def voice(request: Request):
 
 @app.websocket("/ws")
 async def ws(websocket: WebSocket):
-    from switchboard.agent.pipeline import run_call  # deferred: heavy pipecat import
-
     expected_token = _ws_token()
     if expected_token and websocket.query_params.get("token") != expected_token:
         await websocket.close(code=4403)
@@ -115,11 +119,19 @@ async def ws(websocket: WebSocket):
 
     # Twilio sends {"event":"connected"} then {"event":"start", ...}.
     stream_sid = call_sid = None
-    while stream_sid is None:
-        message = json.loads(await websocket.receive_text())
-        if message.get("event") == "start":
-            stream_sid = message["start"]["streamSid"]
-            call_sid = message["start"].get("callSid", "unknown")
+    try:
+        async with asyncio.timeout(WS_HANDSHAKE_TIMEOUT_S):
+            while stream_sid is None:
+                message = json.loads(await websocket.receive_text())
+                if message.get("event") == "start":
+                    stream_sid = message["start"]["streamSid"]
+                    call_sid = message["start"].get("callSid", "unknown")
+    except TimeoutError:
+        logger.warning("closed /ws connection: no start event within handshake timeout")
+        await websocket.close(code=4408)
+        return
+
+    from switchboard.agent.pipeline import run_call  # deferred: heavy pipecat import
 
     playbook = load_playbook(os.getenv("PLAYBOOK", "cod_confirmation"))
     logger.info(f"call {call_sid}: playbook={playbook.name}")

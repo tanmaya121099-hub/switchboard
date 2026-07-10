@@ -10,7 +10,7 @@ starts returning 4xx, check the provider's changelog first — these APIs move.
 
 import os
 from abc import ABC, abstractmethod
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
 import httpx
 
@@ -69,7 +69,10 @@ class CartesiaSonic(TTSProvider):
             "model_id": os.getenv("CARTESIA_MODEL", "sonic-3"),
             "transcript": text,
             # Public sample voice as fallback; set CARTESIA_VOICE_ID from play.cartesia.ai
-            "voice": {"mode": "id", "id": os.getenv("CARTESIA_VOICE_ID") or "a0e99841-438c-4a64-b679-ae501e7d6091"},
+            "voice": {
+                "mode": "id",
+                "id": os.getenv("CARTESIA_VOICE_ID") or "a0e99841-438c-4a64-b679-ae501e7d6091",
+            },
             "output_format": {
                 "container": "raw",
                 "encoding": "pcm_s16le",

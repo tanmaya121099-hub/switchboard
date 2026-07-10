@@ -9,7 +9,7 @@ line, which buffers only ~20 ms frames.
 
 import math
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from time import perf_counter
 
 from switchboard.config import BYTES_PER_SAMPLE
@@ -47,7 +47,7 @@ def percentile(values: list[float], p: float) -> float | None:
 
 
 async def measure_stream(provider, text_id: str, text: str, concurrency: int = 1) -> StreamStats:
-    started_at = datetime.now(timezone.utc).isoformat()
+    started_at = datetime.now(UTC).isoformat()
     t0 = perf_counter()
     ttfb = None
     last = None

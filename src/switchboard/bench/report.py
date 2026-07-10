@@ -12,10 +12,10 @@ from pathlib import Path
 from rich.console import Console
 from rich.table import Table
 
-from switchboard.config import RESULTS_DIR
 from switchboard.bench.metrics import percentile
 from switchboard.bench.providers import PRICING_USD_PER_M_CHARS
 from switchboard.bench.texts import HINGLISH_IDS
+from switchboard.config import RESULTS_DIR
 
 
 def latest_bench_file() -> Path:
@@ -55,7 +55,8 @@ def build_report(data: dict) -> tuple[str, Table]:
     )
 
     table = Table(title=f"TTS streaming latency — {meta['region']} ({meta['timestamp']} UTC)")
-    for col in ("provider", "TTFB p50", "TTFB p95", "RTF p50", "max gap p95", "errors", "$/1M chars"):
+    columns = ("provider", "TTFB p50", "TTFB p95", "RTF p50", "max gap p95", "errors", "$/1M chars")
+    for col in columns:
         table.add_column(col)
 
     md = [
@@ -86,15 +87,26 @@ def build_report(data: dict) -> tuple[str, Table]:
     md += ["", "\\* List pricing at time of run — verify before quoting.", ""]
 
     # Hinglish subsection: the differentiator nobody publishes.
-    md += ["## Hinglish (code-switched) TTFB", "", "| Provider | TTFB p50 | TTFB p95 | Errors |", "|---|---|---|---|"]
+    md += [
+        "## Hinglish (code-switched) TTFB",
+        "",
+        "| Provider | TTFB p50 | TTFB p95 | Errors |",
+        "|---|---|---|---|",
+    ]
     for p in ranked:
         h = aggregate([r for r in seq if r["provider"] == p and r["text_id"] in HINGLISH_IDS])
-        md.append(f"| {p} | {_fmt(h['ttfb_p50'], 'ms')} | {_fmt(h['ttfb_p95'], 'ms')} | {h['errors']}/{h['n']} |")
+        hinglish_cells = (
+            _fmt(h["ttfb_p50"], "ms"),
+            _fmt(h["ttfb_p95"], "ms"),
+            f"{h['errors']}/{h['n']}",
+        )
+        md.append(f"| {p} | " + " | ".join(hinglish_cells) + " |")
 
     # Concurrency degradation.
     levels = [c for c in meta["concurrency"] if c > 1]
     if levels:
-        md += ["", "## TTFB p95 under concurrency", "", "| Provider | " + " | ".join(f"x{c}" for c in [1] + levels) + " |", "|---" * (len(levels) + 2) + "|"]
+        header = "| Provider | " + " | ".join(f"x{c}" for c in [1] + levels) + " |"
+        md += ["", "## TTFB p95 under concurrency", "", header, "|---" * (len(levels) + 2) + "|"]
         for p in ranked:
             cells = [_fmt(by_provider[p]["ttfb_p95"], "ms")]
             for c in levels:

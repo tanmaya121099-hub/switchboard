@@ -13,12 +13,11 @@ number that decides whether a provider survives a call-center-scale rollout.
 import argparse
 import asyncio
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 from loguru import logger
 
-from switchboard.config import RESULTS_DIR, env
 from switchboard.bench.metrics import StreamStats, measure_stream
 from switchboard.bench.providers import (
     ENV_KEYS,
@@ -27,6 +26,7 @@ from switchboard.bench.providers import (
     available_providers,
 )
 from switchboard.bench.texts import TEXTS
+from switchboard.config import RESULTS_DIR, env
 
 REQUEST_TIMEOUT_S = 30
 PAUSE_BETWEEN_TRIALS_S = 0.5  # avoid tripping per-second rate limits
@@ -90,7 +90,9 @@ def main() -> None:
     names = args.providers or available_providers()
     if not names:
         keys = ", ".join(ENV_KEYS.values())
-        raise SystemExit(f"No provider API keys found. Set at least one of: {keys} (see .env.example)")
+        raise SystemExit(
+            f"No provider API keys found. Set at least one of: {keys} (see .env.example)"
+        )
 
     cost = estimate_cost_usd(names, args.trials, args.concurrency)
     logger.info(f"providers: {names} | trials: {args.trials} | concurrency: {args.concurrency}")
@@ -99,7 +101,7 @@ def main() -> None:
     results = asyncio.run(run_bench(names, args.trials, args.concurrency))
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    stamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     out = RESULTS_DIR / f"bench_{stamp}.json"
     out.write_text(
         json.dumps(

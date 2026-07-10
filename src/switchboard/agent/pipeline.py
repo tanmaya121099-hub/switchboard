@@ -9,12 +9,6 @@ import asyncio
 import os
 
 from loguru import logger
-
-from switchboard.config import TELEPHONY_SAMPLE_RATE, env
-from switchboard.agent.observability import CallTrace
-from switchboard.agent.playbooks import Playbook
-from switchboard.agent.router import LatencyRouter
-
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import TTSSpeakFrame
 from pipecat.pipeline.pipeline import Pipeline
@@ -22,6 +16,11 @@ from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
 from pipecat.serializers.twilio import TwilioFrameSerializer
+
+from switchboard.agent.observability import CallTrace
+from switchboard.agent.playbooks import Playbook
+from switchboard.agent.router import LatencyRouter
+from switchboard.config import TELEPHONY_SAMPLE_RATE, env
 
 try:  # transport module moved between pipecat versions
     from pipecat.transports.websocket.fastapi import (
@@ -63,7 +62,8 @@ def make_tts(provider: str):
         from pipecat.services.deepgram.tts import DeepgramTTSService
 
         return DeepgramTTSService(
-            api_key=env("DEEPGRAM_API_KEY"), voice=os.getenv("DEEPGRAM_TTS_MODEL", "aura-2-thalia-en")
+            api_key=env("DEEPGRAM_API_KEY"),
+            voice=os.getenv("DEEPGRAM_TTS_MODEL", "aura-2-thalia-en"),
         )
     raise ValueError(f"unknown TTS provider: {provider}")
 
@@ -115,9 +115,9 @@ def select_tts_with_failover(router: LatencyRouter, trace: CallTrace):
 async def run_call(
     websocket, stream_sid: str, call_sid: str, playbook: Playbook, router: LatencyRouter
 ) -> None:
-    trace = CallTrace(call_sid, playbook.name, "pending", router.snapshot())
+    trace = CallTrace(call_sid, playbook.name, router.snapshot())
     provider, tts = select_tts_with_failover(router, trace)
-    trace._record["tts_provider"] = provider
+    trace.set_tts_provider(provider)
 
     serializer_kwargs = {"stream_sid": stream_sid, "call_sid": call_sid}
     # Account creds enable pipecat's auto-hangup when the pipeline ends.
@@ -182,7 +182,7 @@ async def run_call(
         )
         router.record_success(provider)
         trace.close("completed")
-    except asyncio.TimeoutError:
+    except TimeoutError:
         router.record_success(provider)  # hitting the cap is not a provider failure
         trace.event("max_call_duration_reached", limit_s=max_call_seconds)
         trace.close("timed_out")
