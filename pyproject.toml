@@ -23,6 +23,16 @@ agent = [
     "pipecat-ai[cartesia,deepgram,elevenlabs,openai,anthropic,silero]>=0.0.60",
     "fastapi>=0.110",
     "uvicorn[standard]>=0.29",
+    "python-multipart>=0.0.9",  # starlette needs it to parse Twilio's form POSTs
+]
+# Enough to lint + test without the heavy pipecat stack: server tests only
+# need fastapi (the pipecat import in the ws handler is deferred).
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.4",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "python-multipart>=0.0.9",
 ]
 
 [project.scripts]
@@ -32,3 +42,17 @@ switchboard-agent = "switchboard.agent.server:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/switchboard"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+ignore = ["SIM108"]  # ternaries are not always clearer
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Import from src directly: on macOS, uv editable installs can leave the .pth
+# hidden (see CLAUDE.md), which Python ≥3.11 silently skips.
+pythonpath = ["src"]

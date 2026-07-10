@@ -1,5 +1,7 @@
 # Switchboard
 
+[![CI](https://github.com/tanmaya121099-hub/switchboard/actions/workflows/ci.yml/badge.svg)](https://github.com/tanmaya121099-hub/switchboard/actions/workflows/ci.yml)
+
 **Latency-aware TTS routing for production voice agents.** A benchmark harness that measures what TTS providers actually deliver (not what their marketing says), plus a phone-reachable e-commerce voice agent that uses that data to pick — and fail over between — providers on every call.
 
 Named after the telephone switchboard: the operator that connects each call to the right line. Here, the "operator" is a router that connects each call to the fastest healthy TTS provider, based on measured data.

@@ -7,7 +7,7 @@ call ended. This is the artifact that answers "the bot felt laggy yesterday
 """
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from time import monotonic
 
 from loguru import logger
@@ -18,18 +18,22 @@ TRACES_PATH = CALLS_DIR / "traces.jsonl"
 
 
 class CallTrace:
-    def __init__(self, call_sid: str, playbook: str, tts_provider: str, router_snapshot: dict):
+    def __init__(self, call_sid: str, playbook: str, router_snapshot: dict):
         self._t0 = monotonic()
         self._record = {
             "call_sid": call_sid,
             "playbook": playbook,
-            "tts_provider": tts_provider,
+            # The router picks the provider after the trace starts; see set_tts_provider.
+            "tts_provider": "pending",
             "router": router_snapshot,
-            "started_at": datetime.now(timezone.utc).isoformat(),
+            "started_at": datetime.now(UTC).isoformat(),
             "events": [],
             "status": "in_progress",
         }
         self.event("call_started")
+
+    def set_tts_provider(self, provider: str) -> None:
+        self._record["tts_provider"] = provider
 
     def event(self, name: str, **fields) -> None:
         entry = {"t_ms": round((monotonic() - self._t0) * 1000, 1), "event": name, **fields}
